@@ -3,120 +3,86 @@ import User from '../models/user.model.js'
 import bcrypt from 'bcryptjs'
 
 export const signup = async (req, res) => {
+    const { fullName, email, password, profilePic } = req.body  //  make the request  in index.js 
     try {
-        const { fullName, email, password, profilePic } = req.body;
-
-        // Validation
+        //  creating  tokein   for auth hashing  password  IF  pasword is  less than 6  then  thorw  error  if  not  go forword
         if (!fullName || !email || !password) {
-            return res.status(400).json({ message: "All fields are required" });
+            return res.status(400).json({ message: "All fields are required" })
         }
-
         if (password.length < 6) {
-            return res.status(400).json({ message: "Password must be at least 6 characters" });
+            return res.status(400).json({ message: "password must be at least 6 characters" })
         }
+        const user = await User.findOne({ email })
+        if (user) return res.status(400).json({ message: "Email Already exists" })
 
-        // Check if user exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "Email already exists" });
-        }
+        const salt = await bcrypt.genSalt(10)  // Fixed: getSalt -> genSalt
+        const hashedPassword = await bcrypt.hash(password, salt)
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // Create new user
-        const newUser = new User({
+        const newUser = new User({  // Fixed: newUser -> new User
             fullName,
             email,
             password: hashedPassword,
             profilePic: profilePic || ""
-        });
+        })
 
-        // Save user and generate token
-        await newUser.save();
-        generateToken(newUser._id, res);
+        if (newUser) {
+            //  here  we    write   user  database  with  jwt   token 
+            //   if we   have  nw   use then  success 
+            //  this  is  come  from thev utils 
+            generateToken(newUser._id, res)
+            await newUser.save()
+            res.status(201).json({
+                _id: newUser._id,
+                fullName: newUser.fullName,
+                email: newUser.email,
+                profilePic: newUser.profilePic,
+            })
+        } else {
+            res.status(400).json({ message: "invalid user data" })
+            //   if not  have   new  user then  error 
+        }
+    } catch (error) {
+        console.log("error in signup controller", error.message);
+        res.status(500).json({ message: "Internal Server Error" })
+    }
+}
 
-        res.status(201).json({
-            _id: newUser._id,
-            fullName: newUser.fullName,
-            email: newUser.email,
-            profilePic: newUser.profilePic
-        });
+// in the  login  if  user  passworsd and  email is math then user  is valide otherwise   register   first 
+export const login = async (req, res) => {
+    const { email, password } = req.body  // Fixed: res.body -> req.body
+    try {
+        //  find the user  is  existes  or  not 
+        const user = await User.findOne({ email })
+        if (!user) {
+            return res.status(400).json({ message: "Invalid credentials" })
+        }
+
+        // if  user  find then  may  be the  pass password  is the  wrong 
+        const isPasswordCorrect = await bcrypt.compare(password, user.password)
+        if (!isPasswordCorrect) {
+            return res.status(400).json({ message: "Invalid credentials" })
+        }
+        generateToken(user._id, res)
+
+        res.status(200).json({
+            _id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            profilePic: user.profilePic
+        })
 
     } catch (error) {
-        console.error("Error in signup controller:", error.message);
+        console.log("error in the login controller", error.message)
         res.status(500).json({ message: "Internal Server Error" });
     }
 }
 
-export const login = (req, res) => {
-    res.send("login route")
-}
-
 export const logout = (req, res) => {
-    res.send("logout route")
-}
-
-
-/*import { generateToken } from '../lib/utils.js'
-import User  from '../models/user.model.js'
- import bcrypt from 'bcryptjs'
- export const  signup= async (req,res)=>{
-      const  {fullName,email,password,profilePic}=req.body  //  make the request  in index.js 
-try {
-    //  creating  tokein   for auth hashing  password  IF  pasword is  less than 6  then  thorw  error  if  not  go forword
-     if(!fullName || !email|| !password) {
-        return res.status(400).json({messages:"All  fiealds  are  required"})
-
-     }
-       if (password.length<6){
-        return res.status(400).json({messages:"password  us  must  be  at least 6 characters"})
-       }
-         const user=await User.findOne({email})
-          if(user) return res.status(400).json({messages:"Email Already  exists "})
- 
- const salt= await  bcrypt.getSalt(10)
-  const hashePassword=await bcrypt.hash(password,salt)
-
-   const newUser= newUser({
-    fullName,
-    email,
-    password: hashePassword
-   })
-    if( newUser){
-        //  here  we    write   user  database  with  jwt   token 
-        //   if we   have  nw   use then  success 
-        //  this  is  come  from thev utils 
-         generateToken(newUser._id,res)
-         await newUser.save()
-          res.status(201).json({
-            _id:newUser._id,
-             fullName: newUser.fullName,
-              email:newUser.email,
-              profilePic:newUser.profilePic,
-
-            
-
-    })
-
+    try {
+        res.cookie("jwt", "", { maxAge: 0 })  // Fixed: req.cookie -> res.cookie
+        res.status(200).json({ message: "Logged out successfully" })
+    } catch (error) {
+        console.log("Error in logout controller", error.message)
+        res.status(500).json({ message: "Internal Server Error" });
     }
-      else{
-        res.status(400).json({messages:"invalid user data"})
-        //   if not  have   new  user then  error 
-      }
-} catch (error) {
-    console.log("error  in  signup  controller",error.messages) ;
-    res.status(500).json({messages:"Internal Server Error"})
-
-}     
- }
-
- export const  login=((req,res)=>{
-    res.send("login route")
-})
-
-export const  logout=((req,res)=>{
-    res.send("logout route")
-})
- */
+}
