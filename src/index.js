@@ -21,7 +21,8 @@ const app = express();
 
 
 
-// Middleware
+// Middleware  form the userAuth
+ app.use(express.json())
 
 
 
