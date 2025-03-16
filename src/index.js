@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv'
+import cookieParser  from "cookie-parser"
 import authRoutes from './routes/auth.route.js';
 import { connectDB } from './lib/db.js';
 
@@ -24,6 +25,8 @@ const app = express();
 // Middleware  form the userAuth
  app.use(express.json())
 
+//  this is  cookiePaser  use  for the  profile  update
+ app.use(cookieParser())
 
 
 // Routes
